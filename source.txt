@@ -1,0 +1,512 @@
+# 币安BTC数据源指标清单
+
+## 数据概览
+更新时间: 2026-04-09
+交易对: BTCUSDT
+数据来源: 币安交易所
+
+## 可用指标及时间范围
+
+### 1. K线数据 (5分钟)
+文件名: BTCUSDT_5m_20240807_000000_20260409_103405.csv
+时间范围: 2024-08-06 16:00:00 至 2026-04-09 02:34:59
+数据字段:
+- 开盘时间/收盘时间
+- 开盘价/最高价/最低价/收盘价
+- 成交量/成交额
+- 成交笔数
+- 主动买入量/主动买入金额
+
+### 2. 资金费率历史
+文件名: BTC资金费率历史.csv
+时间范围: 2024-08-17 08:00:00 至 2026-04-09 00:00:00
+数据字段:
+- 资金费率 (fundingRate)
+- 标记价格 (markPrice)
+- 资金费率时间 (每8小时)
+
+### 3. 合约持仓量历史
+文件名: BTC合约持仓量历史.csv
+时间范围: 2026-03-07 03:50:00 至 2026-04-07 03:45:00
+数据字段:
+- 持仓量总和 (sumOpenInterest)
+- 持仓价值总和 (sumOpenInterestValue)
+- CMC流通量 (CMCCirculatingSupply)
+
+### 4. 多空持仓人数比
+文件名: BTC多空持仓人数比.csv
+时间范围: 2026-03-07 04:00:00 至 2026-04-07 03:50:00
+数据字段:
+- 多空比率 (longShortRatio)
+- 多头账户占比 (longAccount)
+- 空头账户占比 (shortAccount)
+
+### 5. 合约主动买卖量
+文件名: BTC合约主动买卖量.csv
+时间范围: 2026-03-07 03:55:00 至 2026-04-07 03:50:00
+数据字段:
+- 买卖比率 (buySellRatio)
+- 主动买入量 (buyVol)
+- 主动卖出量 (sellVol)
+
+### 6. 大户账户数多空比
+文件名: BTC大户账户数多空比.csv
+时间范围: 2026-03-07 04:00:00 至 2026-04-07 03:55:00
+数据字段:
+- 大户多空比率 (longShortRatio)
+- 大户多头账户占比 (longAccount)
+- 大户空头账户占比 (shortAccount)
+
+### 7. 大户持仓量多空比
+文件名: BTC大户持仓量多空比.csv
+时间范围: 2026-03-07 04:00:00 至 2026-04-07 03:55:00
+数据字段:
+- 持仓量多空比率 (longShortRatio)
+- 多头持仓占比 (longAccount)
+- 空头持仓占比 (shortAccount)
+
+## 数据获取脚本
+
+- get_klines.py - K线数据获取
+- get_funding_rate.py - 资金费率获取
+- get_open_interest.py - 持仓量获取
+- get_long_short_ratio.py - 多空持仓人数比获取
+- get_taker_buy_sell_ratio.py - 主动买卖量获取
+- get_top_long_short_account_ratio.py - 大户账户数多空比获取
+- get_top_long_short_ratio.py - 大户持仓量多空比获取
+- get_basis.py - 基差获取
+
+## 技术指标计算方法
+
+### 一、趋势类指标
+
+#### 1. 简单移动平均线 (SMA - Simple Moving Average)
+**计算公式:**
+```
+SMA = (P1 + P2 + ... + Pn) / n
+```
+- P = 价格（通常用收盘价）
+- n = 周期数
+- 常用周期: 5, 10, 20, 50, 100, 200
+
+#### 2. 指数移动平均线 (EMA - Exponential Moving Average)
+**计算公式:**
+```
+EMA_today = (Price_today × K) + (EMA_yesterday × (1 - K))
+K = 2 / (n + 1)
+```
+- n = 周期数
+- 常用周期: 12, 26, 50, 200
+- 对近期价格赋予更高权重
+
+#### 3. MACD (Moving Average Convergence Divergence)
+**计算公式:**
+```
+DIF = EMA(12) - EMA(26)
+DEA (Signal) = EMA(DIF, 9)
+MACD柱 = (DIF - DEA) × 2
+```
+- DIF: 快线（差离值）
+- DEA: 慢线（信号线）
+- 柱状图: 动量强度
+- 零轴交叉、DIF/DEA交叉为信号
+
+#### 4. 布林带 (Bollinger Bands)
+**计算公式:**
+```
+中轨 = SMA(n)
+上轨 = 中轨 + k × σ
+下轨 = 中轨 - k × σ
+σ = √[Σ(Price - SMA)² / n]
+```
+- 标准参数: n=20, k=2
+- σ = 标准差
+- 带宽收窄预示波动即将加剧
+
+#### 5. 抛物线转向指标 (SAR - Parabolic Stop and Reverse)
+**计算公式:**
+```
+SAR_t = SAR_t-1 + AF × (EP - SAR_t-1)
+AF = 初始0.02，每创新高/低增0.02，最大0.2
+EP = 极值点（最高或最低价）
+```
+- 点在价格下方为上升趋势
+- 点在价格上方为下降趋势
+
+#### 6. 一目均衡表 (Ichimoku Cloud)
+**计算公式:**
+```
+转换线 = (9日最高 + 9日最低) / 2
+基准线 = (26日最高 + 26日最低) / 2
+先行带A = (转换线 + 基准线) / 2，前移26日
+先行带B = (52日最高 + 52日最低) / 2，前移26日
+延迟线 = 收盘价，后移26日
+```
+
+#### 7. ADX (Average Directional Index)
+**计算公式:**
+```
++DM = High_today - High_yesterday (若 > 0)
+-DM = Low_yesterday - Low_today (若 > 0)
++DI = EMA(+DM, 14) / ATR × 100
+-DI = EMA(-DM, 14) / ATR × 100
+DX = |+DI - -DI| / (+DI + -DI) × 100
+ADX = EMA(DX, 14)
+```
+- ADX > 25: 强趋势
+- ADX < 20: 弱趋势或盘整
+
+### 二、震荡类指标
+
+#### 8. 相对强弱指数 (RSI - Relative Strength Index)
+**计算公式:**
+```
+RS = 平均上涨幅度 / 平均下跌幅度
+RSI = 100 - (100 / (1 + RS))
+```
+- 标准周期: 14
+- RSI > 70: 超买
+- RSI < 30: 超卖
+- 背离信号重要
+
+#### 9. 随机指标 (Stochastic Oscillator)
+**计算公式:**
+```
+%K = (C - L14) / (H14 - L14) × 100
+%D = SMA(%K, 3)
+```
+- C = 当前收盘价
+- L14 = 14日最低价
+- H14 = 14日最高价
+- %K > 80: 超买
+- %K < 20: 超卖
+
+#### 10. KDJ指标
+**计算公式:**
+```
+RSV = (C - L9) / (H9 - L9) × 100
+K = 2/3 × K_prev + 1/3 × RSV
+D = 2/3 × D_prev + 1/3 × K
+J = 3K - 2D
+```
+- J > 100: 超买
+- J < 0: 超卖
+- 金叉/死叉信号
+
+#### 11. CCI (Commodity Channel Index)
+**计算公式:**
+```
+TP = (High + Low + Close) / 3
+CCI = (TP - SMA(TP, 20)) / (0.015 × 平均绝对偏差)
+```
+- CCI > 100: 超买
+- CCI < -100: 超卖
+
+#### 12. Williams %R
+**计算公式:**
+```
+%R = (H14 - C) / (H14 - L14) × -100
+```
+- %R > -20: 超买
+- %R < -80: 超卖
+
+#### 13. ROC (Rate of Change)
+**计算公式:**
+```
+ROC = (Price_today - Price_n_days_ago) / Price_n_days_ago × 100
+```
+- 常用周期: 12, 25
+- 衡量价格变化速度
+
+### 三、成交量类指标
+
+#### 14. OBV (On-Balance Volume)
+**计算公式:**
+```
+若 Close > Close_prev: OBV = OBV_prev + Volume
+若 Close < Close_prev: OBV = OBV_prev - Volume
+若 Close = Close_prev: OBV = OBV_prev
+```
+- 量价背离预示反转
+
+#### 15. MFI (Money Flow Index)
+**计算公式:**
+```
+TP = (High + Low + Close) / 3
+MF = TP × Volume
+若TP上升: 正MF，若下降: 负MF
+MFI = 100 - (100 / (1 + 正MF总和/负MF总和))
+```
+- 周期: 14
+- MFI > 80: 超买
+- MFI < 20: 超卖
+
+#### 16. VWAP (Volume Weighted Average Price)
+**计算公式:**
+```
+VWAP = Σ(TP × Volume) / Σ(Volume)
+TP = (High + Low + Close) / 3
+```
+- 日内交易重要参考
+- 机构常用基准
+
+#### 17. 成交量移动平均线 (Volume MA)
+**计算公式:**
+```
+Vol_MA = Σ(Volume) / n
+```
+- 常用周期: 5, 10, 20
+- 配合价格确认突破
+
+#### 18. Chaikin Money Flow (CMF)
+**计算公式:**
+```
+MFM = ((Close - Low) - (High - Close)) / (High - Low)
+MFV = MFM × Volume
+CMF = Σ(MFV, 21) / Σ(Volume, 21)
+```
+- CMF > 0: 买压
+- CMF < 0: 卖压
+
+### 四、波动性指标
+
+#### 19. ATR (Average True Range)
+**计算公式:**
+```
+TR = max[(H - L), |H - C_prev|, |L - C_prev|]
+ATR = EMA(TR, 14)
+```
+- 衡量市场波动性
+- 用于设置止损位
+
+#### 20. 历史波动率 (HV - Historical Volatility)
+**计算公式:**
+```
+Return = ln(Price_today / Price_yesterday)
+HV = √(Σ(Return - 平均Return)² / (n-1)) × √252
+```
+- 年化波动率
+- 252 = 交易日数
+
+#### 21. Keltner Channel
+**计算公式:**
+```
+中轨 = EMA(20)
+上轨 = EMA(20) + 2 × ATR(10)
+下轨 = EMA(20) - 2 × ATR(10)
+```
+
+#### 22. Donchian Channel
+**计算公式:**
+```
+上轨 = n日最高价
+下轨 = n日最低价
+中轨 = (上轨 + 下轨) / 2
+```
+- 常用周期: 20
+
+### 五、能量/动量指标
+
+#### 23. 能量潮 (Volume Price Trend, VPT)
+**计算公式:**
+```
+VPT = VPT_prev + Volume × (Close - Close_prev) / Close_prev
+```
+
+#### 24. 心理线 (PSY)
+**计算公式:**
+```
+PSY = 上涨天数 / n × 100
+```
+- 周期: 12
+- PSY > 75: 超买
+- PSY < 25: 超卖
+
+#### 25. Ultimate Oscillator
+**计算公式:**
+```
+BP = Close - min(Low, Close_prev)
+TR = max(High, Close_prev) - min(Low, Close_prev)
+Avg7 = Σ(BP, 7) / Σ(TR, 7)
+Avg14 = Σ(BP, 14) / Σ(TR, 14)
+Avg28 = Σ(BP, 28) / Σ(TR, 28)
+UO = (Avg7 × 4 + Avg14 × 2 + Avg28) / 7 × 100
+```
+
+### 六、支撑/阻力指标
+
+#### 26. Pivot Points
+**计算公式:**
+```
+PP = (High + Low + Close) / 3
+R1 = 2PP - Low
+R2 = PP + (High - Low)
+R3 = High + 2(PP - Low)
+S1 = 2PP - High
+S2 = PP - (High - Low)
+S3 = Low - 2(High - PP)
+```
+
+#### 27. Fibonacci Retracement
+**关键比例:**
+```
+0% = 起点
+23.6% = 起点 + (终点 - 起点) × 0.236
+38.2% = 起点 + (终点 - 起点) × 0.382
+50% = 起点 + (终点 - 起点) × 0.5
+61.8% = 起点 + (终点 - 起点) × 0.618
+78.6% = 起点 + (终点 - 起点) × 0.786
+100% = 终点
+```
+
+### 七、高级指标
+
+#### 28. Elder-Ray Index
+**计算公式:**
+```
+Bull Power = High - EMA(13)
+Bear Power = Low - EMA(13)
+```
+
+#### 29. Aroon Indicator
+**计算公式:**
+```
+Aroon Up = ((25 - 距25日最高的天数) / 25) × 100
+Aroon Down = ((25 - 距25日最低的天数) / 25) × 100
+Aroon Oscillator = Aroon Up - Aroon Down
+```
+
+#### 30. Supertrend
+**计算公式:**
+```
+基本线 = (High + Low) / 2
+上轨 = 基本线 + (乘数 × ATR)
+下轨 = 基本线 - (乘数 × ATR)
+```
+- 乘数通常为3
+- ATR周期: 10
+
+#### 31. Heikin-Ashi (平均K线)
+**计算公式:**
+```
+HA_Close = (Open + High + Low + Close) / 4
+HA_Open = (HA_Open_prev + HA_Close_prev) / 2
+HA_High = max(High, HA_Open, HA_Close)
+HA_Low = min(Low, HA_Open, HA_Close)
+```
+
+#### 32. 价格通道 (Price Channel)
+**计算公式:**
+```
+上轨 = n周期最高价
+下轨 = n周期最低价
+中轨 = (上轨 + 下轨) / 2
+```
+- 常用周期: 20
+
+#### 33. 变动速率指标 (Momentum)
+**计算公式:**
+```
+Momentum = Close - Close_n_days_ago
+```
+- 常用周期: 10
+
+#### 34. 标准差 (Standard Deviation)
+**计算公式:**
+```
+σ = √[Σ(Price - MA)² / n]
+```
+- 衡量价格离散程度
+
+#### 35. 威廉指标 (Williams Accumulation/Distribution)
+**计算公式:**
+```
+若Close > Close_prev: AD = Close - min(Close_prev, Low)
+若Close < Close_prev: AD = Close - max(Close_prev, High)
+若Close = Close_prev: AD = 0
+Williams AD = Σ(AD)
+```
+
+### 八、合约专属指标
+
+#### 36. 持仓量变化率
+**计算公式:**
+```
+OI_Change = (OI_current - OI_prev) / OI_prev × 100
+```
+- 配合价格判断趋势强度
+
+#### 37. 资金费率加权平均
+**计算公式:**
+```
+FR_MA = Σ(FundingRate) / n
+FR_Std = √[Σ(FR - FR_MA)² / n]
+```
+- 高费率预示过度多头/空头
+
+#### 38. 持仓量/成交量比 (OI/Volume Ratio)
+**计算公式:**
+```
+OI/Vol = OpenInterest / Volume_24h
+```
+- 比值上升: 持仓堆积
+- 比值下降: 清仓离场
+
+#### 39. 多空比背离
+**计算公式:**
+```
+LS_Divergence = (LongShortRatio - MA(LongShortRatio, 20)) / σ
+```
+- 标准化背离度
+
+#### 40. Taker Buy/Sell 压力指数
+**计算公式:**
+```
+BS_Pressure = (BuyVol - SellVol) / (BuyVol + SellVol) × 100
+BS_MA = MA(BS_Pressure, 14)
+```
+
+## 注意事项
+
+1. K线和资金费率数据覆盖较长时间范围（约1年8个月）
+2. 其他指标数据范围较短（约1个月），集中在2026年3月-4月
+3. 所有时间戳均为UTC时间
+4. 数据更新频率因指标而异：
+   - K线: 5分钟
+   - 资金费率: 8小时
+   - 其他指标: 5分钟间隔
+
+## 指标使用建议
+
+### 趋势确认组合
+- MACD + EMA(50,200) + ADX
+- 布林带 + ATR
+- 一目均衡表 + SAR
+
+### 超买超卖组合
+- RSI + Stochastic
+- KDJ + CCI
+- MFI + Williams %R
+
+### 突破确认组合
+- 成交量 + OBV
+- VWAP + 布林带
+- ATR + Donchian Channel
+
+### 合约交易组合
+- 资金费率 + 持仓量变化 + 多空比
+- 主动买卖量 + 大户持仓 + Price Action
+- OI/Volume Ratio + 价格趋势
+
+### 周期选择建议
+- **日内交易**: 5m, 15m, 1h K线
+- **短线交易**: 1h, 4h K线
+- **中线交易**: 4h, 1D K线
+- **长线交易**: 1D, 1W K线
+
+### 参数优化原则
+1. 不同市场、不同周期需调整参数
+2. 避免过度优化（曲线拟合）
+3. 回测时考虑交易成本
+4. 多指标组合降低假信号
+5. 定期复盘调整策略
