@@ -3,12 +3,13 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 
-def get_funding_rate_history(symbol='BTCUSDT', limit=1000):
+def get_funding_rate_history(symbol='BTCUSDT', days=1200, limit=1000):
     """
-    拉取币安合约资金费率历史数据（从最新往前追溯30天）
+    拉取币安合约资金费率历史数据（从指定天数前开始往后拉取）
 
     参数:
     symbol: 交易对，默认BTCUSDT
+    days: 拉取天数，默认600天
     limit: 每次请求数量，默认1000（最大值）
     """
     base_url = "https://fapi.binance.com"
@@ -16,27 +17,28 @@ def get_funding_rate_history(symbol='BTCUSDT', limit=1000):
 
     all_data = []
 
-    # 计算目标时间范围（30天）
+    # 计算目标时间范围
     now = datetime.now()
-    target_start_time = int((now - timedelta(days=30)).timestamp() * 1000)
+    start_time = int((now - timedelta(days=days)).timestamp() * 1000)
+    end_time = int(now.timestamp() * 1000)
 
     print(f"开始拉取 {symbol} 资金费率历史数据...")
-    print(f"目标时间范围: 最近30天")
-    print(f"策略: 从最新数据往前追溯\n")
+    print(f"目标时间范围: 最近{days}天")
+    print(f"起始时间: {datetime.fromtimestamp(start_time/1000)}")
+    print(f"结束时间: {datetime.fromtimestamp(end_time/1000)}")
+    print(f"策略: 从历史开始往后拉取\n")
 
     request_count = 0
-    current_end_time = None  # 第一次请求不设置endTime，获取最新数据
+    current_start_time = start_time
 
-    while True:
+    while current_start_time < end_time:
         # 构建请求参数
         params = {
             'symbol': symbol,
+            'startTime': current_start_time,
+            'endTime': end_time,
             'limit': limit
         }
-
-        # 如果有endTime，则添加（用于往前追溯）
-        if current_end_time:
-            params['endTime'] = current_end_time
 
         try:
             # 发送请求
@@ -60,18 +62,13 @@ def get_funding_rate_history(symbol='BTCUSDT', limit=1000):
 
             all_data.extend(data)
 
-            # 如果最早的数据已经达到或超过30天前，停止
-            if first_ts <= target_start_time:
-                print(f"\n已达到30天目标，停止获取")
-                break
-
-            # 如果返回的数据少于limit，说明已经没有更多数据了
+            # 如果返回的数据少于limit，说明已经获取完所有数据
             if len(data) < limit:
                 print(f"\n已获取所有可用数据")
                 break
 
-            # 设置下一次请求的endTime为本次最早记录的时间戳 - 1
-            current_end_time = first_ts - 1
+            # 设置下一次请求的startTime为本次最后一条记录的时间戳 + 1
+            current_start_time = last_ts + 1
 
             # 避免触发频率限制 (和GET /fapi/v1/fundingInfo共享500/5min/IP)
             time.sleep(0.65)
@@ -132,8 +129,8 @@ def save_to_csv(data, filename='BTC资金费率历史.csv'):
     print(f"最小资金费率: {df['fundingRate'].min():.6%}")
 
 if __name__ == "__main__":
-    # 拉取数据（使用最大limit=1000）
-    data = get_funding_rate_history(symbol='BTCUSDT', limit=1000)
+    # 拉取数据（拉取最近600天，使用最大limit=1000）
+    data = get_funding_rate_history(symbol='BTCUSDT', days=600, limit=1000)
 
     # 保存为CSV
     save_to_csv(data, 'BTC资金费率历史.csv')

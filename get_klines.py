@@ -2,8 +2,11 @@ import requests
 import pandas as pd
 from datetime import datetime
 import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-def get_klines(symbol='BTCUSDT', interval='5m', start_time=None, end_time=None, limit=1500):
+def get_klines(symbol='BTCUSDT', interval='5m', start_time=None, end_time=None, limit=1500,
+               timeout=30, max_retries=5, backoff_factor=1):
     """
     拉取币安合约K线数据
 
@@ -13,9 +16,26 @@ def get_klines(symbol='BTCUSDT', interval='5m', start_time=None, end_time=None, 
     start_time: 起始时间（datetime对象或时间戳毫秒）
     end_time: 结束时间（datetime对象或时间戳毫秒）
     limit: 每次请求数量，默认1500（最大值）
+    timeout: 请求超时时间（秒），默认30秒
+    max_retries: 最大重试次数，默认5次
+    backoff_factor: 重试间隔倍数，默认1（重试间隔为 {backoff_factor} * (2 ** (重试次数 - 1)) 秒）
     """
     base_url = "https://fapi.binance.com"
     endpoint = "/fapi/v1/klines"
+
+    # 配置重试策略
+    retry_strategy = Retry(
+        total=max_retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[429, 500, 502, 503, 504],  # 对这些HTTP状态码进行重试
+        allowed_methods=["GET"]
+    )
+
+    # 创建带有重试策略的session
+    session = requests.Session()
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
 
     # 转换时间格式
     if isinstance(start_time, datetime):
@@ -38,7 +58,9 @@ def get_klines(symbol='BTCUSDT', interval='5m', start_time=None, end_time=None, 
     request_count = 0
     current_start = start_timestamp
 
-    while current_start < end_timestamp:
+    all_data_fetched = False  # 标志是否已获取所有数据
+
+    while current_start < end_timestamp and not all_data_fetched:
         # 构建请求参数
         params = {
             'symbol': symbol,
@@ -48,39 +70,58 @@ def get_klines(symbol='BTCUSDT', interval='5m', start_time=None, end_time=None, 
             'limit': limit
         }
 
-        try:
-            # 发送请求
-            response = requests.get(base_url + endpoint, params=params)
-            response.raise_for_status()
+        retry_count = 0
+        success = False
 
-            data = response.json()
-            request_count += 1
+        while retry_count <= max_retries and not success:
+            try:
+                # 发送请求，使用session和timeout
+                response = session.get(base_url + endpoint, params=params, timeout=timeout)
+                response.raise_for_status()
 
-            if not data:
-                print("没有更多数据")
-                break
+                data = response.json()
+                request_count += 1
+                success = True
 
-            # 获取时间范围
-            first_time = datetime.fromtimestamp(data[0][0]/1000)
-            last_time = datetime.fromtimestamp(data[-1][0]/1000)
+                if not data:
+                    print("没有更多数据")
+                    all_data_fetched = True
+                    break
 
-            print(f"第 {request_count} 次请求: 获取 {len(data)} 条记录 [{first_time} 至 {last_time}]")
+                # 获取时间范围
+                first_time = datetime.fromtimestamp(data[0][0]/1000)
+                last_time = datetime.fromtimestamp(data[-1][0]/1000)
 
-            all_data.extend(data)
+                print(f"第 {request_count} 次请求: 获取 {len(data)} 条记录 [{first_time} 至 {last_time}]")
 
-            # 如果返回的数据少于limit，说明已经获取完所有数据
-            if len(data) < limit:
-                print(f"\n已获取所有可用数据")
-                break
+                all_data.extend(data)
 
-            # 设置下一次请求的起始时间为本次最后一根K线的收盘时间 + 1毫秒
-            current_start = data[-1][6] + 1
+                # 如果返回的数据少于limit，说明已经获取完所有数据
+                if len(data) < limit:
+                    print(f"\n已获取所有可用数据")
+                    all_data_fetched = True
+                    break
 
-            # 避免触发频率限制
-            time.sleep(0.1)
+                # 设置下一次请求的起始时间为本次最后一根K线的收盘时间 + 1毫秒
+                current_start = data[-1][6] + 1
 
-        except requests.exceptions.RequestException as e:
-            print(f"请求错误: {e}")
+                # 避免触发频率限制
+                time.sleep(0.1)
+
+            except requests.exceptions.RequestException as e:
+                retry_count += 1
+                if retry_count <= max_retries:
+                    wait_time = backoff_factor * (2 ** (retry_count - 1))
+                    print(f"请求错误 (第 {retry_count}/{max_retries} 次重试): {e}")
+                    print(f"等待 {wait_time} 秒后重试...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"请求失败，已达到最大重试次数: {e}")
+                    all_data_fetched = True  # 失败时也退出主循环
+                    break
+
+        # 如果所有重试都失败，跳出主循环
+        if not success:
             break
 
     print(f"\n总请求次数: {request_count}")
@@ -172,7 +213,7 @@ if __name__ == "__main__":
 
     # 设置时间范围（示例：最近7天）
     end_time = datetime.now()
-    start_time = datetime(2026, 1, 1, 0, 0, 0)  # 可以自定义具体日期
+    start_time = datetime(2024, 8, 7, 0, 0, 0)  # 可以自定义具体日期
 
     # 或者使用相对时间
     # from datetime import timedelta
