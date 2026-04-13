@@ -211,7 +211,7 @@ def save_klines_to_csv(data, symbol, interval, start_time, end_time):
 
 if __name__ == "__main__":
     # 配置参数
-    symbol = 'DOGEUSDT'          # 交易对
+    symbol = 'BTCUSDT'          # 交易对
     interval = '5m'             # K线周期：1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
 
     # 设置时间范围（示例：最近7天）
