@@ -175,8 +175,11 @@ def save_klines_to_csv(data, symbol, interval, start_time, end_time):
 
     df['trades'] = df['trades'].astype(int)
 
+    # 添加Unix时间戳列（秒）
+    df['timestamp'] = (df['open_time'] / 1000).astype(int)
+
     # 重新排列列顺序（把时间列放在前面）
-    columns_order = ['open_datetime', 'close_datetime', 'open', 'high', 'low', 'close',
+    columns_order = ['timestamp', 'open_datetime', 'close_datetime', 'open', 'high', 'low', 'close',
                      'volume', 'quote_volume', 'trades',
                      'taker_buy_volume', 'taker_buy_quote_volume',
                      'open_time', 'close_time']
